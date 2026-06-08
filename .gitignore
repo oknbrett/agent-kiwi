@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtualenv
+.venv/
+venv/
+
+# Test / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Eval run output (badge is committed by CI, local runs are not)
+eval/last_run.json
+
+# Env / secrets
+.env
+
+# OS
+.DS_Store

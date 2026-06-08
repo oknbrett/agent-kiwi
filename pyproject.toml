@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-kiwi"
+version = "0.1.0"
+description = "An AI coach-assistant that knows when to involve a human — with a real memory engine, Agent Skills, and an outcome-graded eval suite."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "anthropic>=0.40",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+]
+
+[project.scripts]
+kiwi-simulate = "simulate_week:main"
+kiwi-eval = "eval.run:main"
+
+[tool.setuptools]
+packages = ["kiwi", "eval"]
+
+[tool.setuptools.package-data]
+kiwi = ["skills/*/SKILL.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

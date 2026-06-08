@@ -1,0 +1,51 @@
+name: agent-eval
+
+# An LLM agent drifts as the model and prompts change. A test you run once and
+# forget proves nothing. This runs the eval suite on a schedule and on demand,
+# gates the result, and refreshes the status badge so the README always reflects
+# the *current* behaviour, not a snapshot from the day it was written.
+
+on:
+  schedule:
+    - cron: "0 6 1 * *"   # 06:00 UTC on the 1st of every month
+  workflow_dispatch: {}    # let a human kick it off any time
+  push:
+    paths:
+      - "kiwi/**"
+      - "eval/**"
+      - ".github/workflows/eval-monthly.yml"
+
+permissions:
+  contents: write          # to commit the refreshed badge
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Unit tests (deterministic core)
+        run: pytest -q
+
+      - name: Agent eval (live model)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python -m eval.run --threshold 0.9
+
+      - name: Commit refreshed badge
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add eval/badge.json eval/last_run.json || true
+          git commit -m "chore(eval): refresh status badge [skip ci]" || echo "no changes"
+          git push || echo "nothing to push"

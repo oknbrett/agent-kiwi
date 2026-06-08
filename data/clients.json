@@ -1,0 +1,80 @@
+{
+  "_comment": "A scripted, deterministic week for the demo. Four clients, Monday to Friday, building to Sofia's Friday escalation. simulate_week.py replays this through the real agent.",
+  "clients": [
+    {
+      "id": "maya",
+      "name": "Maya",
+      "goal": "Marathon in 10 weeks",
+      "notes": "Experienced runner, high adherence. The happy path."
+    },
+    {
+      "id": "tom",
+      "name": "Tom",
+      "goal": "Lose 8kg over 12 weeks",
+      "notes": "Trains before work. Tends to downplay problems and goes quiet when work is busy."
+    },
+    {
+      "id": "sofia",
+      "name": "Sofia",
+      "goal": "Return to running 9 months post-ACL reconstruction",
+      "notes": "Left ACL reconstruction last year. Cleared for light loading only; physio-guided."
+    },
+    {
+      "id": "liam",
+      "name": "Liam",
+      "goal": "Get back into a regular routine",
+      "notes": "Re-starting after a long break. History of ghosting check-ins."
+    }
+  ],
+  "seed_memory": {
+    "sofia": [
+      {
+        "body": "Post-ACL reconstruction on the left knee; physio cleared light loading only",
+        "type": "client_profile",
+        "at": "2026-05-01"
+      }
+    ],
+    "tom": [
+      {
+        "body": "Downplays aches; says 'I'm fine' even when something is off",
+        "type": "observation",
+        "subtype": "adherence",
+        "trigger": "asked an open question about how he feels",
+        "at": "2026-05-15"
+      }
+    ],
+    "liam": [
+      {
+        "body": "Did not reply to the previous two check-ins",
+        "type": "waiting_for_reply",
+        "at": "2026-05-28"
+      }
+    ]
+  },
+  "week": {
+    "2026-06-01": {
+      "maya": ["felt great on today's tempo run, hit all my paces"],
+      "tom": ["got the morning session in before work, felt good"],
+      "sofia": ["did my rehab exercises, knee a little stiff but nothing bad"]
+    },
+    "2026-06-02": {
+      "maya": ["easy recovery run, legs feel fresh"],
+      "tom": ["had to skip today, work was completely mad"],
+      "sofia": ["knee felt stable through the whole session today"]
+    },
+    "2026-06-03": {
+      "maya": ["long intervals this morning, really tough but I got through them"],
+      "sofia": ["bit of an ache after going up and down the stairs at work"]
+    },
+    "2026-06-04": {
+      "maya": ["legs are wrecked after yesterday's intervals, can barely walk"],
+      "tom": ["back at it this morning, decent session"],
+      "sofia": ["noticed my knee clicking a little during lunges"]
+    },
+    "2026-06-05": {
+      "maya": ["starting to taper, feeling strong and ready"],
+      "tom": ["good week overall, three sessions done"],
+      "sofia": ["sharp pain in my surgical knee today, and it's worse going downstairs"]
+    }
+  }
+}
