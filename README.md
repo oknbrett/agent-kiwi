@@ -11,6 +11,9 @@ I use in production agent work — a real memory engine, Agent Skills with
 progressive disclosure, and an outcome-graded eval suite — in a clean, sharable
 domain. It is deliberately small enough to read in one sitting.
 
+> **Why it's built this way:** see [`DESIGN_NOTES.md`](DESIGN_NOTES.md) for the
+> decisions, the alternatives I rejected, and the trade-offs I accepted.
+
 ---
 
 ## What it demonstrates
