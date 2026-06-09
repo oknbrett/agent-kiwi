@@ -142,6 +142,36 @@ def test_apply_evidence_contradiction_pulls_2x():
     assert obs.confidence == 0.3  # 0.5 - CONTRADICT_STEP
 
 
+def test_json_round_trip_is_lossless():
+    store = MemoryStore()
+    store.add(
+        "sofia",
+        author_entry(
+            body="Post-ACL; light loading only",
+            type="client_profile",
+            today=TODAY,
+        ),
+    )
+    store.add(
+        "sofia",
+        author_entry(
+            body="Stair-loading aggravates the knee",
+            type="observation",
+            subtype="recovery",
+            trigger="client reports stair use",
+            confidence=0.82,
+            today=TODAY,
+        ),
+    )
+    store.add("liam", author_entry(body="No reply x2", type="waiting_for_reply", today=TODAY))
+
+    restored = MemoryStore.from_json(store.to_json())
+    assert restored.to_json() == store.to_json()
+    assert sorted(restored.client_ids()) == ["liam", "sofia"]
+    # And the restored store renders identical prompt context.
+    assert restored.context_for("sofia", TODAY) == store.context_for("sofia", TODAY)
+
+
 def test_reflection_triggers_on_accumulated_importance():
     doc = MemoryDoc()
     # 3 escalation_decisions (importance 8 each) = 24 > threshold of 20.

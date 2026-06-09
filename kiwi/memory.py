@@ -380,3 +380,16 @@ class MemoryStore:
     # Persistence (round-trips through plain JSON so a run is reproducible).
     def to_json(self) -> str:
         return json.dumps({cid: d.to_dict() for cid, d in self._docs.items()}, indent=2)
+
+    @classmethod
+    def from_json(cls, payload: str) -> "MemoryStore":
+        """Rebuild a store from a to_json dump. to_json(from_json(x)) == x."""
+        store = cls()
+        for client_id, doc_dict in json.loads(payload).items():
+            doc = MemoryDoc(
+                version=doc_dict.get("version", 2),
+                entries=[MemoryEntry(**e) for e in doc_dict.get("entries", [])],
+                last_reflected_at=doc_dict.get("last_reflected_at"),
+            )
+            store._docs[client_id] = doc
+        return store
