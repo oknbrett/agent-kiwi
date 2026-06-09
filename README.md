@@ -169,12 +169,26 @@ eval/
 tests/             deterministic unit tests (no network)
 data/clients.json  the scripted demo week
 simulate_week.py   the end-to-end demo
+dashboard/         coach-console UI (Vite + React + TS) visualising the demo week
+```
+
+### The dashboard (`dashboard/`)
+
+A coach-console view of the demo week — the client list, the day-by-day triage
+log, each client's memory (with confidence meters), and the
+recommendation-first digest, opening on Friday's escalation. It renders the
+same scripted week the agent runs (`data/clients.json`); it is a
+visualisation, not a live connection to the loop.
+
+```bash
+cd dashboard && npm install && npm run dev
 ```
 
 ## Scope
 
 Intentionally out of scope (kept simple on purpose): real messaging/calendar
-integrations, a web UI, sub-agents, and a persistent database (the store
-round-trips through plain JSON). The model is configurable in `kiwi/agent.py`.
+integrations, sub-agents, and a persistent database (the store round-trips
+through plain JSON). The dashboard visualises the scripted demo week rather
+than driving the live agent. The model is configurable in `kiwi/agent.py`.
 
 Built by Khoi Nguyen Ong. MIT licensed.

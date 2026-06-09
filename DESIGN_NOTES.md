@@ -132,7 +132,10 @@ Kept deliberately simple so the core ideas stay legible:
 - **No real integrations** (messaging, calendar) — observations are seeded.
 - **No database** — the store round-trips through plain JSON; persistence is a
   solved problem and not what this project is demonstrating.
-- **No web UI** — the demo is a terminal replay (`simulate_week.py`).
+- **UI is a visualisation, not a control plane** — the demo is a terminal
+  replay (`simulate_week.py`); `dashboard/` renders the same scripted week for
+  a coach's-eye view but does not drive the live agent. Wiring a UI to the
+  loop is plumbing, not the patterns this project demonstrates.
 - **No sub-agents** — see above; they'd add cost without buying anything here.
 
 The model is a single constant in `agent.py`, swappable in one place.

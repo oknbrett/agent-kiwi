@@ -23,3 +23,10 @@ eval/last_run.json
 
 # OS
 .DS_Store
+
+# Local Claude tooling
+.claude/
+
+# Dashboard
+dashboard/node_modules/
+dashboard/dist/
