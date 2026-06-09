@@ -95,6 +95,18 @@ the coach learns to ignore you, which is *worse* than not flagging. So clear DOM
 both directions: escalation positives *and* over-escalation negatives. Safety and
 restraint are graded together.
 
+## Why a parse failure escalates
+
+If triage returns something that can't be parsed into a verdict, Kiwi escalates
+— with a reason that says so explicitly ("escalating by policy, not by
+judgement"). The alternative, defaulting to `monitor`, reads safer ("don't page
+the human over a formatting bug") but has the wrong failure mode: a real risk
+silently downgraded because the model fenced its JSON wrong. The asymmetric
+rule applies to the system's own faults, not just the model's judgement calls —
+an unreadable verdict is maximal uncertainty, and uncertainty routes to the
+human. The reason string keeps it honest: the coach can see it's a system
+fault, not a health call, so it doesn't train them to distrust real flags.
+
 ## Why the eval is built this way
 
 A non-deterministic system still has to be tested like an engineered one.

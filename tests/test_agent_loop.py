@@ -179,6 +179,25 @@ def test_daily_run_drops_note_without_trigger():
     assert agent.memory.context_for("maya", TODAY).startswith("(no notes yet")
 
 
+def test_unreadable_triage_verdict_escalates_by_policy():
+    """A parse failure is maximal uncertainty — it must fail toward the human,
+    never silently downgrade into the monitor tier."""
+    agent = KiwiAgent(
+        client=FakeClient([
+            _tool_use("flag-health-risk", {}),
+            _Resp([_Block("text", text="I think the knee thing is probably fine?")], "end_turn"),
+        ])
+    )
+    obs = Observation(client_id="sofia", date=TODAY, source="client_message",
+                      text="weird feeling in my knee")
+    esc = agent.triage(_sofia(), obs)
+
+    assert esc.decision == "escalate"
+    assert "no readable verdict" in esc.reason
+    # And it is recorded, so the coach digest will carry it.
+    assert "ESCALATE" in agent.memory.context_for("sofia", TODAY)
+
+
 def test_routine_decision_writes_no_memory():
     agent = KiwiAgent(
         client=FakeClient([

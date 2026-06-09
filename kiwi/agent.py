@@ -232,15 +232,33 @@ class KiwiAgent:
         )
         raw = self._run_loop(user, force_skill="flag-health-risk")
         data = _extract_json(raw) or {}
-        decision = data.get("decision", "monitor")
+        decision = data.get("decision")
         if decision not in ("escalate", "monitor", "none"):
-            decision = "monitor"
+            # An unreadable verdict is maximal uncertainty, and the triage rule
+            # is asymmetric on purpose: when uncertain, fail toward the human.
+            # A parse failure must surface as "look at this", not vanish into
+            # the monitor tier — the catastrophic case is a real risk silently
+            # downgraded by a formatting bug.
+            return self._escalate_unreadable(client, obs)
         esc = Escalation(
             client_id=client.id,
             date=obs.date,
             decision=decision,  # type: ignore[arg-type]
             reason=data.get("reason", "").strip(),
             recommended_action=data.get("recommended_action", "").strip(),
+            source_text=obs.text,
+        )
+        self._record_triage(client, esc)
+        return esc
+
+    def _escalate_unreadable(self, client: Client, obs: Observation) -> Escalation:
+        """The triage verdict could not be parsed — route to the human."""
+        esc = Escalation(
+            client_id=client.id,
+            date=obs.date,
+            decision="escalate",
+            reason="Triage produced no readable verdict — escalating by policy, not by judgement.",
+            recommended_action="Read the observation yourself; the agent could not classify it.",
             source_text=obs.text,
         )
         self._record_triage(client, esc)
