@@ -10,6 +10,7 @@ from kiwi.memory import (
     DEFAULT_CONFIDENCE,
     ENTRY_HARD_CAP,
     MemoryDoc,
+    MemoryStore,
     author_entry,
     compact_entries,
     next_confidence,
@@ -101,6 +102,44 @@ def test_hard_cap_protects_profile_and_trims_oldest():
     kept = compact_entries(entries, TODAY)
     assert len(kept) <= ENTRY_HARD_CAP
     assert profile in kept  # the oldest entry, but protected
+
+
+def test_apply_evidence_moves_only_real_observations():
+    store = MemoryStore()
+    obs = author_entry(
+        body="Skips sessions when work is busy",
+        type="observation",
+        trigger="a deadline week",
+        confidence=0.5,
+        today=TODAY,
+    )
+    profile = author_entry(body="Goal: lose 8kg", type="client_profile", today=TODAY)
+    store.add("tom", obs)
+    store.add("tom", profile)
+
+    n_confirm, n_contradict = store.apply_evidence(
+        "tom",
+        confirmed=[obs.id],
+        # A hallucinated id and the (confidence-less) profile id must be ignored.
+        contradicted=["not-a-real-id", profile.id],
+    )
+    assert (n_confirm, n_contradict) == (1, 0)
+    assert obs.confidence == 0.6
+    assert profile.confidence is None  # untouched — profiles carry no confidence
+
+
+def test_apply_evidence_contradiction_pulls_2x():
+    store = MemoryStore()
+    obs = author_entry(
+        body="Prefers evening sessions",
+        type="observation",
+        trigger="scheduling a session",
+        confidence=0.5,
+        today=TODAY,
+    )
+    store.add("maya", obs)
+    store.apply_evidence("maya", confirmed=[], contradicted=[obs.id])
+    assert obs.confidence == 0.3  # 0.5 - CONTRADICT_STEP
 
 
 def test_reflection_triggers_on_accumulated_importance():

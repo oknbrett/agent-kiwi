@@ -274,6 +274,23 @@ def format_memory_for_claude(doc: MemoryDoc, today: str) -> str:
     return "\n".join(lines).strip()
 
 
+def format_observations_for_review(doc: MemoryDoc, today: str) -> str:
+    """List active observations with their ids, for evidence reconciliation.
+
+    The daily run shows the model this block so it can name which observations
+    today's signals confirm or contradict. Ids are the contract: the model
+    references them, `MemoryStore.apply_evidence` resolves them.
+    """
+    obs = [e for e in visible_entries(doc, today) if e.type == "observation"]
+    if not obs:
+        return ""
+    lines = ["Observations under review (cite ids in confirmed/contradicted):"]
+    for e in obs:
+        suffix = f" (when: {e.trigger})" if e.trigger else ""
+        lines.append(f"  [{e.id}] {e.body}{suffix}")
+    return "\n".join(lines)
+
+
 def cumulative_importance_since(doc: MemoryDoc) -> int:
     """Sum the importance of entries authored after the last reflection boundary."""
     since = doc.last_reflected_at or ""
@@ -321,6 +338,41 @@ class MemoryStore:
     def compact(self, client_id: str, today: str) -> None:
         d = self.doc(client_id)
         d.entries = compact_entries(d.entries, today)
+
+    def apply_evidence(
+        self,
+        client_id: str,
+        *,
+        confirmed: list[str],
+        contradicted: list[str],
+    ) -> tuple[int, int]:
+        """Update observation confidence from today's evidence.
+
+        Called by the daily run after the model names which observations the
+        day's signals confirmed or contradicted. Only observations move —
+        profile facts and episodic entries have no confidence to update. Ids
+        the model invents (or that have since been pruned) are ignored rather
+        than raised: a hallucinated id must not corrupt the journal.
+
+        Returns (n_confirmed, n_contradicted) actually applied.
+        """
+        by_id = {e.id: e for e in self.doc(client_id).entries if e.type == "observation"}
+        n_confirm = n_contradict = 0
+        for entry_id in confirmed:
+            e = by_id.get(entry_id)
+            if e is not None:
+                e.confidence = next_confidence(e.confidence, "confirm")
+                n_confirm += 1
+        for entry_id in contradicted:
+            e = by_id.get(entry_id)
+            if e is not None:
+                e.confidence = next_confidence(e.confidence, "contradict")
+                n_contradict += 1
+        return n_confirm, n_contradict
+
+    def observations_for_review(self, client_id: str, today: str) -> str:
+        """Id-listed view of one client's active observations (single-client scoped)."""
+        return format_observations_for_review(self.doc(client_id), today)
 
     def client_ids(self) -> list[str]:
         return list(self._docs.keys())

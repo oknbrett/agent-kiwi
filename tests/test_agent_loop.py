@@ -113,6 +113,72 @@ def test_escalation_is_recorded_only_for_the_right_client():
     assert agent.memory.context_for("maya", TODAY).startswith("(no notes yet")
 
 
+def test_daily_run_reconciles_observation_confidence():
+    """The loop closes: today's evidence moves observation confidence and a new
+    pattern (with its mandatory trigger) lands in the journal."""
+    from kiwi.memory import MemoryStore, author_entry
+
+    store = MemoryStore()
+    quiet = author_entry(
+        body="Goes quiet when work is busy",
+        type="observation",
+        trigger="a busy work week",
+        confidence=0.5,
+        today=TODAY,
+    )
+    evenings = author_entry(
+        body="Prefers evening sessions",
+        type="observation",
+        trigger="scheduling a session",
+        confidence=0.5,
+        today=TODAY,
+    )
+    store.add("tom", quiet)
+    store.add("tom", evenings)
+
+    agent = KiwiAgent(
+        memory=store,
+        client=FakeClient([
+            _tool_use("daily-checkin", {}),
+            _final_json(
+                '{"message": "Noted, Tom — what does tomorrow look like?", '
+                f'"memory_note": "Responds well to a single concrete question", '
+                f'"note_trigger": "writing a check-in after a missed session", '
+                f'"confirmed": ["{quiet.id}"], "contradicted": ["{evenings.id}"]}}'
+            ),
+        ]),
+    )
+    client = Client(id="tom", name="Tom", goal="Lose 8kg")
+    result = agent.daily_run(client, [], TODAY)
+
+    assert result.text.startswith("Noted, Tom")
+    assert quiet.confidence == 0.6  # confirmed: +0.1
+    assert evenings.confidence == 0.3  # contradicted: -0.2 (2x pull)
+    # The new note was persisted as a real observation, trigger and all.
+    ctx = store.context_for("tom", TODAY)
+    assert "Responds well to a single concrete question" in ctx
+    # The prompt actually offered the ids for review.
+    first_user_msg = agent._client.calls[0]["messages"][0]["content"]
+    assert quiet.id in first_user_msg and evenings.id in first_user_msg
+
+
+def test_daily_run_drops_note_without_trigger():
+    """A memory_note missing its trigger is dropped, not saved degraded —
+    the observation invariant (validate_entry) holds on the write path."""
+    agent = KiwiAgent(
+        client=FakeClient([
+            _tool_use("daily-checkin", {}),
+            _final_json(
+                '{"message": "Nice work today.", "memory_note": "Seems motivated", '
+                '"note_trigger": "", "confirmed": [], "contradicted": []}'
+            ),
+        ])
+    )
+    client = Client(id="maya", name="Maya", goal="Marathon in 10 weeks")
+    agent.daily_run(client, [], TODAY)
+    assert agent.memory.context_for("maya", TODAY).startswith("(no notes yet")
+
+
 def test_routine_decision_writes_no_memory():
     agent = KiwiAgent(
         client=FakeClient([

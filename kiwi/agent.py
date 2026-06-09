@@ -99,6 +99,13 @@ def _system_blocks(catalog: str) -> list[dict[str, Any]]:
     ]
 
 
+def _as_str_list(value: Any) -> list[str]:
+    """Defensive coercion for model-produced id lists (drop non-strings)."""
+    if not isinstance(value, list):
+        return []
+    return [v for v in value if isinstance(v, str)]
+
+
 def _extract_json(text: str) -> Optional[dict]:
     """Pull the first JSON object out of a model reply (handles ```json fences)."""
     fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
@@ -255,28 +262,56 @@ class KiwiAgent:
     def daily_run(
         self, client: Client, observations: list[Observation], sim_date: str
     ) -> ChatResult:
-        """Autonomous daily touchpoint: triage today's signals, then check in."""
+        """Autonomous daily touchpoint: triage, check in, reconcile the memory."""
         # 1. Triage everything that came in today (escalations get recorded).
         for obs in observations:
             self.triage(client, obs)
 
-        # 2. Write a grounded check-in via the daily-checkin skill.
+        # 2. Write a grounded check-in via the daily-checkin skill. The prompt
+        #    includes the client's observations with ids so the model can name
+        #    which ones today's evidence confirms or contradicts.
         memory_ctx = self.memory.context_for(client.id, sim_date)
+        review = self.memory.observations_for_review(client.id, sim_date)
         recent = "\n".join(f"- [{o.date} · {o.source}] {o.text}" for o in observations)
         user = (
             f"Run today's check-in for {client.name} (goal: {client.goal}). "
             f"Today is {sim_date}.\n"
             f"What the coach knows: {client.notes or '(nothing on file)'}\n\n"
             f"Memory for this client:\n{memory_ctx}\n\n"
-            f"What came in today:\n{recent or '(nothing today)'}\n\n"
+            + (f"{review}\n\n" if review else "")
+            + f"What came in today:\n{recent or '(nothing today)'}\n\n"
             "Use the daily-checkin skill and return its JSON only."
         )
         raw = self._run_loop(user, force_skill="daily-checkin")
         data = _extract_json(raw) or {}
-        result = ChatResult(
-            text=data.get("message", "").strip(),
-            memory_note=data.get("memory_note", "").strip(),
+
+        # 3. Apply the evidence verdicts: confirmation nudges confidence up,
+        #    contradiction pulls it down 2x. This is what makes stale beliefs
+        #    fade instead of living forever (see memory.next_confidence).
+        self.memory.apply_evidence(
+            client.id,
+            confirmed=_as_str_list(data.get("confirmed")),
+            contradicted=_as_str_list(data.get("contradicted")),
         )
+
+        # 4. Persist anything new the model judged worth remembering. The
+        #    trigger is mandatory for observations (validate_entry enforces it),
+        #    so a note without one is dropped, not saved degraded.
+        note = (data.get("memory_note") or "").strip()
+        trigger = (data.get("note_trigger") or "").strip()
+        if note and trigger:
+            self.memory.add(
+                client.id,
+                author_entry(
+                    body=note,
+                    type="observation",
+                    today=sim_date,
+                    subject=client.name,
+                    trigger=trigger,
+                ),
+            )
+
+        result = ChatResult(text=data.get("message", "").strip(), memory_note=note)
         self.memory.compact(client.id, sim_date)
         return result
 

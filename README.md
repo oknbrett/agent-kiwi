@@ -81,7 +81,9 @@ A framework-free port of a structured-memory engine I built in production:
   pattern, must carry an explicit *trigger*), and episodic state.
 - **Confidence dynamics** — observations carry a weight; confirmation raises it
   (+0.1), contradiction lowers it twice as fast (−0.2, asymmetric). Below a floor
-  they stop surfacing.
+  they stop surfacing. The daily run closes this loop: the model is shown the
+  client's observations with ids and names which ones today's evidence confirmed
+  or contradicted; `apply_evidence` moves the weights.
 - **Deterministic compaction** — because entries are structured, pruning needs no
   LLM call: expire → provenance cascade (an observation whose sources are all
   gone fades) → age-prune → hard cap that protects profile facts.
