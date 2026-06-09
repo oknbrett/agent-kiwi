@@ -78,18 +78,19 @@ def _extract_json(text: str) -> Optional[dict]:
         return None
 
 
-def grade_rubric(case: dict, text: str, client: Any, memory_context: str = "") -> Grade:
-    """Grade output against a rubric, with the memory the agent actually had.
+def grade_rubric(case: dict, text: str, client: Any, grounding: str = "") -> Grade:
+    """Grade output against a rubric, with the inputs the agent actually had.
 
-    The judge must see the agent's source material: a fidelity rubric like
-    "don't invent metrics" is unjudgeable without knowing which facts were in
-    memory — a date or count that *is* in the journal is grounded, not invented.
+    The judge must see the agent's source material — the client record and the
+    memory. A fidelity rubric like "don't invent metrics" is unjudgeable
+    without it: a date, count, or goal that *is* in the grounding is grounded,
+    not invented.
     """
     rubric = case.get("rubric", "")
     memory_block = (
-        f"MEMORY THE ASSISTANT HAD (facts present here are grounded, not invented):\n"
-        f"{memory_context}\n\n"
-        if memory_context
+        f"WHAT THE ASSISTANT HAD (facts present here are grounded, not invented):\n"
+        f"{grounding}\n\n"
+        if grounding
         else ""
     )
     user = (

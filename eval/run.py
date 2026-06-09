@@ -87,10 +87,16 @@ def _run_case(case: dict, anthropic_client) -> CaseResult:
 
     elif grader == "rubric":
         text = _produce_text(agent, client, channel, case)
-        # The judge sees the memory the agent had — fidelity ("don't invent
-        # facts") is unjudgeable without the ground truth to compare against.
-        memory_context = store.context_for(client.id, RUN_DATE)
-        g = judge.grade_rubric(case, text, anthropic_client, memory_context)
+        # The judge sees everything the agent legitimately had — the client
+        # record AND the memory. Fidelity ("don't invent facts") is
+        # unjudgeable without the full ground truth: a goal from the client
+        # record is grounded, not invented.
+        grounding = (
+            f"Client record: {client.name} — goal: {client.goal}; "
+            f"notes: {client.notes or '(none)'}\n\n"
+            f"{store.context_for(client.id, RUN_DATE)}"
+        )
+        g = judge.grade_rubric(case, text, anthropic_client, grounding)
 
     else:
         g = judge.Grade(False, f"unknown grader {grader!r}")
