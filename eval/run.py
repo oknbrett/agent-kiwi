@@ -70,7 +70,8 @@ def _seed_store(case: dict) -> MemoryStore:
 
 def _run_case(case: dict, anthropic_client) -> CaseResult:
     client = Client(**case["client"])
-    agent = KiwiAgent(memory=_seed_store(case), client=anthropic_client)
+    store = _seed_store(case)
+    agent = KiwiAgent(memory=store, client=anthropic_client)
     channel = case["channel"]
     grader = case["grader"]
 
@@ -86,7 +87,10 @@ def _run_case(case: dict, anthropic_client) -> CaseResult:
 
     elif grader == "rubric":
         text = _produce_text(agent, client, channel, case)
-        g = judge.grade_rubric(case, text, anthropic_client)
+        # The judge sees the memory the agent had — fidelity ("don't invent
+        # facts") is unjudgeable without the ground truth to compare against.
+        memory_context = store.context_for(client.id, RUN_DATE)
+        g = judge.grade_rubric(case, text, anthropic_client, memory_context)
 
     else:
         g = judge.Grade(False, f"unknown grader {grader!r}")

@@ -78,20 +78,37 @@ def _extract_json(text: str) -> Optional[dict]:
         return None
 
 
-def grade_rubric(case: dict, text: str, client: Any) -> Grade:
+def grade_rubric(case: dict, text: str, client: Any, memory_context: str = "") -> Grade:
+    """Grade output against a rubric, with the memory the agent actually had.
+
+    The judge must see the agent's source material: a fidelity rubric like
+    "don't invent metrics" is unjudgeable without knowing which facts were in
+    memory — a date or count that *is* in the journal is grounded, not invented.
+    """
     rubric = case.get("rubric", "")
+    memory_block = (
+        f"MEMORY THE ASSISTANT HAD (facts present here are grounded, not invented):\n"
+        f"{memory_context}\n\n"
+        if memory_context
+        else ""
+    )
     user = (
         f"RUBRIC:\n{rubric}\n\n"
+        f"{memory_block}"
         f"ASSISTANT OUTPUT:\n{text or '(empty)'}\n\n"
         "Does the output satisfy the rubric?"
     )
-    resp = client.messages.create(
-        model=JUDGE_MODEL,
-        max_tokens=256,
-        system=_JUDGE_SYSTEM,
-        messages=[{"role": "user", "content": user}],
-    )
-    raw = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
-    data = _extract_json(raw) or {}
-    passed = bool(data.get("pass", False))
-    return Grade(passed, data.get("reason", "no reason given").strip())
+    # One retry if the judge's own reply doesn't parse: a judge formatting
+    # flake is not evidence about the agent, and must not flap the gate.
+    for attempt in range(2):
+        resp = client.messages.create(
+            model=JUDGE_MODEL,
+            max_tokens=256,
+            system=_JUDGE_SYSTEM,
+            messages=[{"role": "user", "content": user}],
+        )
+        raw = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+        data = _extract_json(raw)
+        if data is not None and "pass" in data:
+            return Grade(bool(data["pass"]), data.get("reason", "no reason given").strip())
+    return Grade(False, "judge reply unparseable after retry")
