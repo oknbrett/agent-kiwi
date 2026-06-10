@@ -26,6 +26,8 @@ import re
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from kiwi.resilience import call_with_retry
+
 JUDGE_MODEL = "claude-haiku-4-5"
 
 
@@ -99,14 +101,18 @@ def grade_rubric(case: dict, text: str, client: Any, grounding: str = "") -> Gra
         f"ASSISTANT OUTPUT:\n{text or '(empty)'}\n\n"
         "Does the output satisfy the rubric?"
     )
-    # One retry if the judge's own reply doesn't parse: a judge formatting
-    # flake is not evidence about the agent, and must not flap the gate.
+    # Two distinct retry concerns, layered:
+    #  - call_with_retry handles transient *transport* faults (overload, 429);
+    #  - this loop handles the judge emitting *unparseable* JSON, which is a
+    #    different failure and not evidence about the agent under test.
     for attempt in range(2):
-        resp = client.messages.create(
-            model=JUDGE_MODEL,
-            max_tokens=256,
-            system=_JUDGE_SYSTEM,
-            messages=[{"role": "user", "content": user}],
+        resp = call_with_retry(
+            lambda: client.messages.create(
+                model=JUDGE_MODEL,
+                max_tokens=256,
+                system=_JUDGE_SYSTEM,
+                messages=[{"role": "user", "content": user}],
+            )
         )
         raw = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
         data = _extract_json(raw)

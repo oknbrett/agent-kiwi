@@ -36,6 +36,7 @@ from typing import Any, Optional
 
 from .domain import Client, Escalation, Observation
 from .memory import MemoryEntry, MemoryStore, author_entry
+from .resilience import CallTrace, call_with_retry
 from .skill_loader import (
     SkillMeta,
     discover_skills,
@@ -141,6 +142,7 @@ class KiwiAgent:
         self.skills = skills if skills is not None else discover_skills()
         self.catalog = render_skill_catalog(self.skills)
         self._client = client  # injectable for tests; real one is created lazily
+        self.last_trace: list[dict] = []  # events from the most recent _run_loop
 
     # ── LLM plumbing ──────────────────────────────────────────────────────────
 
@@ -162,15 +164,23 @@ class KiwiAgent:
         user_content: str,
         *,
         force_skill: Optional[str] = None,
+        channel: str = "loop",
+        client_id: str = "",
     ) -> str:
         """Run the manual tool-use loop until the model stops calling tools.
 
         If force_skill is set, the first turn is forced to call `use_skill` so a
         triage call can't skip its skill. After that the loop is model-driven.
+
+        Every model call goes through `call_with_retry`, so a transient overload
+        or rate-limit is retried with backoff instead of crashing the run, and a
+        `CallTrace` records each attempt for replay (see resilience.py).
         """
         client = self._anthropic()
         system = _system_blocks(self.catalog)
         messages: list[dict[str, Any]] = [{"role": "user", "content": user_content}]
+        trace = CallTrace(channel, client_id)
+        self.last_trace = trace.events
 
         final_text = ""
         for turn in range(MAX_TOOL_TURNS):
@@ -184,7 +194,18 @@ class KiwiAgent:
             if turn == 0 and force_skill:
                 kwargs["tool_choice"] = {"type": "tool", "name": "use_skill"}
 
-            resp = client.messages.create(**kwargs)
+            resp = call_with_retry(
+                lambda kw=kwargs: client.messages.create(**kw),
+                on_event=lambda e, t=turn: trace.record(turn=t, **e),
+            )
+            usage = getattr(resp, "usage", None)
+            trace.record(
+                phase="response",
+                turn=turn,
+                stop_reason=getattr(resp, "stop_reason", None),
+                input_tokens=getattr(usage, "input_tokens", None),
+                output_tokens=getattr(usage, "output_tokens", None),
+            )
             # Preserve the full content (incl. any tool_use blocks) for the next turn.
             messages.append({"role": "assistant", "content": resp.content})
 
@@ -230,7 +251,9 @@ class KiwiAgent:
             f"Observation [{obs.date} · {obs.source}]: {obs.text}\n\n"
             "Use the flag-health-risk skill and return its JSON verdict only."
         )
-        raw = self._run_loop(user, force_skill="flag-health-risk")
+        raw = self._run_loop(
+            user, force_skill="flag-health-risk", channel="triage", client_id=client.id
+        )
         data = _extract_json(raw) or {}
         decision = data.get("decision")
         if decision not in ("escalate", "monitor", "none"):
@@ -300,7 +323,9 @@ class KiwiAgent:
             + f"What came in today:\n{recent or '(nothing today)'}\n\n"
             "Use the daily-checkin skill and return its JSON only."
         )
-        raw = self._run_loop(user, force_skill="daily-checkin")
+        raw = self._run_loop(
+            user, force_skill="daily-checkin", channel="daily", client_id=client.id
+        )
         data = _extract_json(raw) or {}
 
         # 3. Apply the evidence verdicts: confirmation nudges confidence up,
@@ -343,7 +368,9 @@ class KiwiAgent:
             f"Memory for this client:\n{memory_ctx}\n\n"
             "Use the summarize-for-coach skill and return its JSON only."
         )
-        raw = self._run_loop(user, force_skill="summarize-for-coach")
+        raw = self._run_loop(
+            user, force_skill="summarize-for-coach", channel="summarize", client_id=client.id
+        )
         data = _extract_json(raw) or {}
         return data.get("summary", "").strip()
 
@@ -357,4 +384,4 @@ class KiwiAgent:
             f"Message: {message}\n\n"
             "Reply as the coach's assistant. Reach for a skill if one fits."
         )
-        return self._run_loop(user)
+        return self._run_loop(user, channel="chat", client_id=client.id)

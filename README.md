@@ -26,7 +26,10 @@ domain. It is deliberately small enough to read in one sitting.
 **1. A real agent, not a prompt wrapper.** `kiwi/agent.py` runs a manual
 tool-use loop: it loads its own instructions on demand, executes tools, feeds
 results back, and loops until done. It keeps a structured, per-client memory that
-it reads before acting and updates after.
+it reads before acting and updates after. Every model call is wrapped for
+production reality — transient overloads and rate limits are **retried with
+exponential backoff**, and each call emits a **structured JSON-lines trace**
+(channel, latency, retries, tokens) you can replay (`kiwi/resilience.py`).
 
 **2. It knows when to involve a human.** The whole point of a coaching assistant
 is routing risk to the human, not playing doctor. Kiwi triages every client
@@ -163,6 +166,7 @@ kiwi/
   domain.py        typed contracts (Client, Observation, Escalation, CoachDigest)
   memory.py        the structured memory engine + per-client MemoryStore
   agent.py         the agent loop (triage / daily_run / chat / summarize)
+  resilience.py    retry-with-backoff + structured call trace for model calls
   coach.py         escalation collection + recommendation-first digest
   skill_loader.py  progressive disclosure (Level 1 catalog / Level 2 bodies)
   skills/          flag-health-risk, daily-checkin, log-client-observation,
@@ -173,7 +177,7 @@ eval/
   run.py           one-command runner, scoreboard, gate, badge
 tests/             deterministic unit tests (no network)
 data/clients.json  the scripted demo week
-simulate_week.py   the end-to-end demo
+simulate_week.py   the end-to-end demo (--trace prints the JSON call trace)
 dashboard/         coach-console UI (Vite + React + TS) visualising the demo week
 ```
 

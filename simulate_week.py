@@ -22,6 +22,7 @@ from kiwi.agent import KiwiAgent
 from kiwi.coach import build_digest, render_digest
 from kiwi.domain import Client, Observation
 from kiwi.memory import MemoryStore, author_entry
+from kiwi.resilience import configure_logging
 
 DATA = Path(__file__).parent / "data" / "clients.json"
 
@@ -38,6 +39,11 @@ def _seed(store: MemoryStore, seed_memory: dict) -> None:
 
 
 def main() -> int:
+    # `--trace` turns on the JSON-lines call trace (every model attempt, its
+    # latency, retries, and token usage) so the resilience layer is visible.
+    if "--trace" in sys.argv:
+        configure_logging()
+
     cfg = _load()
     clients = [Client(**c) for c in cfg["clients"]]
     by_id = {c.id: c for c in clients}

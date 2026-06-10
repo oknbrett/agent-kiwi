@@ -107,6 +107,33 @@ an unreadable verdict is maximal uncertainty, and uncertainty routes to the
 human. The reason string keeps it honest: the coach can see it's a system
 fault, not a health call, so it doesn't train them to distrust real flags.
 
+## Why the model calls retry themselves, and leave a trace
+
+A demo calls the model once and hopes. In production that call fails for boring,
+*transient* reasons — the model is overloaded (HTTP 529), you hit a rate limit
+(429), a connection blips. None of those mean the agent is broken; they mean
+"try again in a moment". So every model call in `agent.py` goes through
+`resilience.call_with_retry`, which retries transient faults with **exponential
+backoff + jitter** and gives up loudly on the rest.
+
+Two decisions worth calling out:
+
+- **Retry only what might succeed on a retry.** A 429 or 529 is worth waiting
+  out; a 400 (bad request) is *our* bug and re-sending it just burns time and
+  money on the same broken call. `is_retryable` draws that line, so a real
+  defect surfaces immediately instead of hiding behind four slow retries.
+- **Backoff with jitter, not a tight loop.** Each wait doubles (0.5s, 1s, 2s…)
+  and is capped, with a little randomness added so a fleet of agents recovering
+  from the same outage don't all retry in lockstep and re-spike the service.
+
+Alongside it, every call emits a structured **JSON-lines trace** (`CallTrace`):
+channel, client, attempt, latency, retries, stop reason, token usage. When an
+agent does something surprising in production, "we'll look into it" becomes
+"here is exactly what it saw and decided at 14:32". `simulate_week.py --trace`
+turns it on. The whole layer is dependency-free and unit-tested with an injected
+`sleep`/`rng` (`tests/test_resilience.py`), so the retry schedule is asserted
+deterministically with no real waiting and no network.
+
 ## Why the eval is built this way
 
 A non-deterministic system still has to be tested like an engineered one.
@@ -132,6 +159,12 @@ Kept deliberately simple so the core ideas stay legible:
 - **No real integrations** (messaging, calendar) — observations are seeded.
 - **No database** — the store round-trips through plain JSON; persistence is a
   solved problem and not what this project is demonstrating.
+- **Resilience is real but minimal** — model calls retry transient faults with
+  backoff and emit a trace (see above). What's deliberately *not* here: a
+  circuit breaker, a dead-letter queue for calls that exhaust their retries, and
+  shipping the trace to a real sink (OpenTelemetry / a log aggregator) rather
+  than stderr. Those are the next production steps, called out so the boundary
+  is honest rather than implied.
 - **UI is a visualisation, not a control plane** — the demo is a terminal
   replay (`simulate_week.py`); `dashboard/` renders the same scripted week for
   a coach's-eye view but does not drive the live agent. Wiring a UI to the

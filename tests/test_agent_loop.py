@@ -198,6 +198,28 @@ def test_unreadable_triage_verdict_escalates_by_policy():
     assert "ESCALATE" in agent.memory.context_for("sofia", TODAY)
 
 
+def test_run_loop_records_a_trace_per_call():
+    """Every model call leaves a structured trace (attempt + response events),
+    tagged with the channel and client — the observability the agent needs in
+    production to replay what happened."""
+    agent = KiwiAgent(
+        client=FakeClient([
+            _tool_use("flag-health-risk", {}),
+            _final_json('{"decision": "none", "reason": "DOMS", "recommended_action": ""}'),
+        ])
+    )
+    obs = Observation(client_id="maya", date=TODAY, source="client_message",
+                      text="legs sore after the long run")
+    agent.triage(_maya(), obs)
+
+    phases = [e.get("phase") for e in agent.last_trace]
+    assert "attempt" in phases and "response" in phases
+    assert all(e["channel"] == "triage" for e in agent.last_trace)
+    assert all(e["client_id"] == "maya" for e in agent.last_trace)
+    # Two model calls were made (forced skill, then the verdict), so two responses.
+    assert phases.count("response") == 2
+
+
 def test_routine_decision_writes_no_memory():
     agent = KiwiAgent(
         client=FakeClient([
