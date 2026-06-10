@@ -6,6 +6,11 @@ An AI coach-assistant for a solo personal trainer. It triages what clients
 report, sends grounded daily check-ins, and — the part that matters — **knows
 when to pull the human coach in** and when to stay out of the way.
 
+![A scripted week through the live agent: Friday ends with Sofia's post-surgical knee pain escalated to the coach, while Maya's marathon soreness is left alone](assets/demo.gif)
+
+*A real run of `simulate_week.py` (rendered by `tools/render_demo_gif.py` from
+the captured output in `assets/week_output.txt`).*
+
 Kiwi is a portfolio project: a compact, end-to-end agent that shows the patterns
 I use in production agent work — a real memory engine, Agent Skills with
 progressive disclosure, and an outcome-graded eval suite — in a clean, sharable
