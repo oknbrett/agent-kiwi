@@ -1,6 +1,6 @@
 ---
 name: flag-health-risk
-description: Decide whether a client observation is a genuine health risk that must be escalated to the human coach. Use whenever a client reports pain, injury, illness, dizziness, or a sharp change in how their body feels — and to confirm that ordinary training soreness is NOT escalated.
+description: Decide whether a client observation is a genuine health risk that must be escalated to the human coach. Use whenever a client reports pain, injury, illness, dizziness, or a sharp change in how their body feels — and to confirm that ordinary training soreness is NOT escalated. This is about physical risk; for a client drifting away or missing sessions, use flag-disengagement instead.
 ---
 # Flag Health Risk
 

@@ -30,10 +30,14 @@ than reaching for a framework because:
 
 ## Why Agent Skills, not sub-agents
 
-The specialised behaviours — triage, daily check-in, observation logging, coach
-summary — are **skills** (a `SKILL.md` per folder), loaded by progressive
-disclosure: only names + one-line descriptions sit in context at rest; full
-instructions load via the `use_skill` tool when a task triggers them.
+The specialised behaviours — triage, disengagement-spotting, daily check-in,
+client replies, observation logging, the daily digest, the weekly report — are
+**skills** (a `SKILL.md` per folder), loaded by progressive disclosure: only
+names + one-line descriptions sit in context at rest; full instructions load via
+the `use_skill` tool when a task triggers them. Some are pinned to a structured
+channel (triage forces `flag-health-risk`); the rest the model selects in the
+open chat channel. Adding the last three skills cost the resting context only
+three more one-line descriptions — which is the entire point.
 
 I considered a sub-agent per behaviour and rejected it:
 

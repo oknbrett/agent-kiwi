@@ -1,6 +1,6 @@
 ---
 name: log-client-observation
-description: Turn a raw client message or metric into a structured, durable memory entry. Use whenever new information about a client arrives that is worth remembering — preferences, recurring patterns, injuries, scheduling constraints, or progress.
+description: Turn a raw client message or metric into a structured, durable memory entry — or decide it isn't worth saving. Use this whenever new information about a client arrives that might change a future decision: preferences, recurring patterns, injuries, scheduling constraints, or progress. Use it even when you suspect the answer is "don't save" — deciding what NOT to remember is half the job.
 ---
 # Log Client Observation
 
@@ -38,3 +38,13 @@ return `{"save": false}`.
   "trigger": "explicit fire condition (observations only, else omit)"
 }
 ```
+
+## Worked examples
+- *"I had ACL surgery on my left knee last year"* → durable fact.
+  `{"save": true, "type": "client_profile", "body": "ACL reconstruction on left knee (last year); cleared for light loading only"}`
+- *"I keep skipping Tuesdays when work piles up"* → a pattern; needs a trigger.
+  `{"save": true, "type": "observation", "body": "Tends to skip mid-week sessions during busy work periods", "subtype": "adherence", "trigger": "a weekday session is scheduled during a busy work week"}`
+- *"ugh today was rough, so tired"* → transient mood, no durable signal.
+  `{"save": false}`
+- *"my goal is really just to get back into a routine"* but the goal is already
+  on file → already captured, don't duplicate. `{"save": false}`

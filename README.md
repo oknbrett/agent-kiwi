@@ -107,17 +107,28 @@ the agent loop via an injected fake client).
 
 ## Why Agent Skills, not sub-agents
 
-Kiwi's specialised behaviours — triage, daily check-in, observation logging,
-coach summary — live as **Agent Skills**: folders under `kiwi/skills/` each with
-a `SKILL.md` (YAML frontmatter + instructions). They load by **progressive
-disclosure**: only each skill's name + one-line description sit in context at
-rest (Level 1); the full instructions are pulled in via the `use_skill` tool only
-when a task triggers them (Level 2).
+Kiwi's specialised behaviours live as **Agent Skills**: folders under
+`kiwi/skills/` each with a `SKILL.md` (YAML frontmatter + instructions). They
+load by **progressive disclosure**: only each skill's name + one-line description
+sit in context at rest (Level 1); the full instructions are pulled in via the
+`use_skill` tool only when a task triggers them (Level 2).
+
+The library is seven skills today, in two groups:
+
+- **Channel-forced** — the agent's structured entry points pin a specific skill
+  so the path can't be skipped: `flag-health-risk` (triage), `daily-checkin`
+  (the autonomous run), `summarize-for-coach` (the digest).
+- **Model-selected** — in the open `chat` channel the model reaches for whatever
+  fits via `use_skill`: `respond-to-client`, `flag-disengagement` (the
+  adherence-risk counterpart to `flag-health-risk`), `log-client-observation`,
+  `weekly-progress-report`. This is the progressive-disclosure payoff in action —
+  the catalog grew without making any single call more expensive.
 
 I chose skills over a constellation of sub-agents on purpose:
 
-- **Context economy.** Twenty skills cost twenty short descriptions at rest, not
-  twenty full instruction sets. The body tokens stay out of context until needed.
+- **Context economy.** Seven skills (or seventy) cost only their short
+  descriptions at rest, not their full instruction sets. The body tokens stay out
+  of context until a task actually needs them.
 - **One reasoning thread.** A sub-agent swarm fragments state across agents and
   pays a serialization tax at every hand-off. Triage that needs the client's
   memory *and* the escalation rule shouldn't require two agents to negotiate —
@@ -169,8 +180,9 @@ kiwi/
   resilience.py    retry-with-backoff + structured call trace for model calls
   coach.py         escalation collection + recommendation-first digest
   skill_loader.py  progressive disclosure (Level 1 catalog / Level 2 bodies)
-  skills/          flag-health-risk, daily-checkin, log-client-observation,
-                   summarize-for-coach  (each a SKILL.md)
+  skills/          flag-health-risk, flag-disengagement, daily-checkin,
+                   respond-to-client, log-client-observation,
+                   summarize-for-coach, weekly-progress-report (each a SKILL.md)
 eval/
   cases.jsonl      ~21 cases: escalation, over-escalation, isolation, fidelity
   judge.py         graders: deterministic decision, forbidden-token, LLM rubric
